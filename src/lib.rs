@@ -2,7 +2,6 @@ use json::JsonValue;
 use reqwest::StatusCode;
 use regex::Regex;
 use reqwest::header::RANGE;
-use std::fs::File;
 use youtube::youtube::*;
 use requests::requests::*;
 use errors::*;
@@ -12,7 +11,6 @@ mod requests;
 
 #[macro_use]
 extern crate error_chain;
-
 pub mod errors {
     use std::io;
 
@@ -45,18 +43,21 @@ pub async fn get_available_sources(video_url: &str) -> Result<Vec<DownloadSource
     adaptive_formats.into_iter().map(|f| f.clone()).map(|f| DownloadSource::try_from(f)).collect()
 }
 
-pub async fn download_video(source: DownloadSource, output_file: &str) -> Result<()> {
+pub async fn download_video(source: &DownloadSource, output_file: &str, chunk_size: Option<u32>) -> Result<()> {
     let client = reqwest::Client::new();
-    let video_url = source.video_url;
+    let video_url = &source.video_url;
     let length = source.content_length;
-    let mut output_file = File::create(output_file).chain_err(|| "Could not create output file")?;
+    let mut output_file = tokio::fs::File::create(output_file)
+        .await.chain_err(|| "Error while creating output file")?;
 
-    const CHUNK_SIZE: u32 = 10240;
+    let chunk_size = if chunk_size.is_some() { chunk_size.unwrap() } else { length as u32 };
 
+    println!("Source to download from: {video_url}");
+    println!("Length: {length}");
     println!("starting download...");
-    for range in PartialRangeIter::new(0, length-1, CHUNK_SIZE)? {
+    for range in PartialRangeIter::new(0, length-1, chunk_size)? {
         println!("range: {:#?}", range);
-        let response = client.get(&video_url).header(RANGE, range).send().await
+        let response = client.get(video_url).header(RANGE, range).send().await
             .chain_err(|| "Could not send partial request for video")?;
 
         let status = response.status();
@@ -65,13 +66,20 @@ pub async fn download_video(source: DownloadSource, output_file: &str) -> Result
             bail!("Response status code was not OK or PARTIAL_CONTENT");
         }
         
-        let content = response.text().await.chain_err(|| "No video content returned")?;
-        std::io::copy(&mut content.as_bytes(), &mut output_file)
-            .chain_err(|| "Could not copy video content to output file")?;
+        let bytes = response.bytes().await.chain_err(|| "Could not get response bytes")?;
+        tokio::io::copy(&mut &*bytes, &mut output_file)
+            .await.chain_err(|| "Error while copying the response to the output file")?; 
     } 
     
     println!("Finished successfuly!");
     Ok(())
+}
+
+#[macro_export]
+macro_rules! download_video {
+    ( $s:expr,$o:expr ) => {
+        download_video($s,$o,None)
+    };
 }
 
 #[cfg(test)]
@@ -80,7 +88,7 @@ mod tests {
 
     #[tokio::test]
     async fn available_sources_are_returned() {
-        let available_sources = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA&pp=ygUMcG91dHNlcyBtcGxl")
+        let available_sources = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA")
             .await.unwrap();
         assert_eq!(16, available_sources.len());
         assert_eq!(4, available_sources.iter().filter(|s| s.mime_type.contains("audio")).count());
@@ -88,13 +96,22 @@ mod tests {
 
     #[tokio::test]
     async fn video_is_downloaded() {
-        const OUTPUT_FILE: &str = "download.mp4"; 
-        let source = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA&pp=ygUMcG91dHNlcyBtcGxl")
+        const OUTPUT_FILE: &str = "assets/test.m4a"; 
+        const TEST_OUTPUT_FILE: &str = "assets/test-output.m4a"; 
+
+        let output_file = tokio::fs::File::create(OUTPUT_FILE)
+            .await.unwrap();
+        let test_output_file = tokio::fs::File::open(TEST_OUTPUT_FILE)
+            .await.unwrap();
+
+        let source = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA")
             .await.unwrap().into_iter().filter(|s| s.mime_type.contains("audio")).next().unwrap();
-        let video = download_video(source, OUTPUT_FILE).await;
+        let video = download_video!(&source, OUTPUT_FILE).await;
+
         assert!(video.is_ok());
-        let output_file = File::open(OUTPUT_FILE).unwrap();
-        assert!(output_file.metadata().unwrap().len() > 0); 
+
+        assert!(output_file.metadata().await.unwrap().len() > 0); 
+        assert_eq!(test_output_file.metadata().await.unwrap().len(), output_file.metadata().await.unwrap().len()); 
     }
 
     #[allow(dead_code)]
