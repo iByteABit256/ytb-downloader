@@ -37,7 +37,7 @@ Add `ytb-downloader` to Cargo.toml and import it:
 use ytb-downloader::*;
 ```
 
-Note that the library is uses async/await so
+Note that the library uses async/await so
 ```
 tokio = { version = "1.27.0", features = ["macros", "rt-multi-thread", "fs"] }
 ```
