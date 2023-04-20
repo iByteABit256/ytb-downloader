@@ -2,6 +2,8 @@ pub mod requests {
     use reqwest::header::HeaderValue;
     use super::super::errors::*;
 
+    // Credits to Rust Cookbook
+    // https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html#make-a-partial-download-with-http-range-headers
     pub struct PartialRangeIter {
       start: u64,
       end: u64,
