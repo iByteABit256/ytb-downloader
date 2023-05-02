@@ -1,43 +1,46 @@
-pub mod requests {
-    use reqwest::header::HeaderValue;
-    use super::super::errors::*;
+use super::errors::*;
+use reqwest::header::HeaderValue;
 
-    // Credits to Rust Cookbook
-    // https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html#make-a-partial-download-with-http-range-headers
-    pub struct PartialRangeIter {
-      start: u64,
-      end: u64,
-      buffer_size: u32,
-    }
+// Credits to Rust Cookbook
+// https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html#make-a-partial-download-with-http-range-headers
+pub struct PartialRangeIter {
+    start: u64,
+    end: u64,
+    buffer_size: u32,
+}
 
-    impl PartialRangeIter {
-      pub fn new(start: u64, end: u64, buffer_size: u32) -> Result<Self> {
+impl PartialRangeIter {
+    pub fn new(start: u64, end: u64, buffer_size: u32) -> Result<Self> {
         if buffer_size == 0 {
-          Err("invalid buffer_size, give a value greater than zero.")?;
+            Err("invalid buffer_size, give a value greater than zero.")?;
         }
         Ok(PartialRangeIter {
-          start,
-          end,
-          buffer_size,
+            start,
+            end,
+            buffer_size,
         })
-      }
     }
+}
 
-    impl Iterator for PartialRangeIter {
-      type Item = HeaderValue;
-      fn next(&mut self) -> Option<Self::Item> {
+impl Iterator for PartialRangeIter {
+    type Item = HeaderValue;
+    fn next(&mut self) -> Option<Self::Item> {
         if self.start > self.end {
-          None
+            None
         } else {
-          let prev_start = self.start;
-          self.start += std::cmp::min(self.buffer_size as u64, self.end - self.start + 1);
-          Some(HeaderValue::from_str(&format!("bytes={}-{}", prev_start, self.start - 1)).expect("string provided by format!"))
+            let prev_start = self.start;
+            self.start += std::cmp::min(self.buffer_size as u64, self.end - self.start + 1);
+            Some(
+                HeaderValue::from_str(&format!("bytes={}-{}", prev_start, self.start - 1))
+                    .expect("string provided by format!"),
+            )
         }
-      }
     }
+}
 
-    pub fn create_request_body(vid: &str) -> String {
-        format!("{{
+pub fn create_request_body(vid: &str) -> String {
+    format!(
+        "{{
         \"context\": {{
             \"client\": {{
                 \"hl\": \"en\",
@@ -71,7 +74,6 @@ pub mod requests {
         }},
         \"racyCheckOk\": false,
         \"contentCheckOk\": false
-        }}")
-    }
+        }}"
+    )
 }
-
