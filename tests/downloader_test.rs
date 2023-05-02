@@ -1,33 +1,46 @@
+use youtube::DownloadSource;
 use ytb_downloader::*;
-use youtube::youtube::DownloadSource;
 
 #[tokio::test]
 async fn available_sources_are_returned() {
     let available_sources = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA")
-        .await.unwrap();
+        .await
+        .unwrap();
     assert_eq!(16, available_sources.len());
-    assert_eq!(4, available_sources.iter().filter(|s| s.mime_type.contains("audio")).count());
+    assert_eq!(
+        4,
+        available_sources
+            .iter()
+            .filter(|s| s.mime_type.contains("audio"))
+            .count()
+    );
 }
 
 #[tokio::test]
 async fn video_is_downloaded() {
-    const OUTPUT_FILE: &str = "assets/test.m4a"; 
-    const TEST_OUTPUT_FILE: &str = "assets/test-output.m4a"; 
+    const OUTPUT_FILE: &str = "assets/test.m4a";
+    const TEST_OUTPUT_FILE: &str = "assets/test-output.m4a";
 
-    let output_file = tokio::fs::File::create(OUTPUT_FILE)
-        .await.unwrap();
-    let test_output_file = tokio::fs::File::open(TEST_OUTPUT_FILE)
-        .await.unwrap();
+    let output_file = tokio::fs::File::create(OUTPUT_FILE).await.unwrap();
+    let test_output_file = tokio::fs::File::open(TEST_OUTPUT_FILE).await.unwrap();
 
     let source = get_available_sources("https://www.youtube.com/watch?v=pqhfyrW_BEA")
-        .await.unwrap().into_iter().filter(|s| s.mime_type.contains("audio")).next().unwrap();
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|s| s.mime_type.contains("audio"))
+        .next()
+        .unwrap();
 
     let video = download_video!(&source, OUTPUT_FILE).await;
 
     assert!(video.is_ok());
 
-    assert!(output_file.metadata().await.unwrap().len() > 0); 
-    assert_eq!(test_output_file.metadata().await.unwrap().len(), output_file.metadata().await.unwrap().len()); 
+    assert!(output_file.metadata().await.unwrap().len() > 0);
+    assert_eq!(
+        test_output_file.metadata().await.unwrap().len(),
+        output_file.metadata().await.unwrap().len()
+    );
 }
 
 #[allow(dead_code)]
@@ -46,6 +59,5 @@ fn mock_download_source() -> DownloadSource {
         audio_quality: Some("AUDIO_QUALITY_MEDIUM".to_string()),
         audio_sample_rate: Some(44100),
         audio_channels: Some(2),
-    }    
+    }
 }
-
