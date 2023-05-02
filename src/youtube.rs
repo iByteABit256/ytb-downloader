@@ -46,7 +46,7 @@ pub struct DownloadSource {
 /// ## Example
 ///
 /// ```
-/// # use ytb_downloader::youtube::youtube::parse_video_id;
+/// # use ytb_downloader::youtube::parse_video_id;
 /// let video_id = parse_video_id("https://www.youtube.com/watch?v=some_video").unwrap();
 /// ```
 pub fn parse_video_id(video_url: &str) -> Result<String> {
